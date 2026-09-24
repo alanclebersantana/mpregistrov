@@ -173,9 +173,9 @@ dialog#dlgConn::backdrop{background:rgba(0,0,0,.45)}
   <!-- estado vazio -->
   <section id="emptyView" class="empty">
     <div class="drop" id="drop">
-      <h2>Conecte a planilha</h2>
+      <h2 id="emptyTitle">Conecte a planilha</h2>
       <p><button class="btn primary" id="btnConn2" type="button">Conectar à planilha online</button></p>
-      <p style="font-size:13px">Os dados vêm direto da planilha de vendas, via Apps Script, e se atualizam sozinhos.<br>Cartões, senhas de conta e CPFs não são enviados.</p>
+      <p style="font-size:13px" id="emptyMsg">Os dados vêm direto da planilha de vendas, via Apps Script, e se atualizam sozinhos.<br>Cartões, senhas de conta e CPFs não são enviados.</p>
     </div>
   </section>
 
@@ -267,6 +267,15 @@ dialog#dlgConn::backdrop{background:rgba(0,0,0,.45)}
 <script>
 (function(){
 'use strict';
+/* ============================================================
+   ▼▼▼ CONEXÃO FIXA — preencha e o app já abre conectado ▼▼▼
+   URL: a do App da Web do Apps Script (termina em /exec)
+   CHAVE: a mesma da constante CHAVE no Code.gs
+   ============================================================ */
+const API_URL   = 'COLE-AQUI-A-URL-DO-APPS-SCRIPT/exec';
+const API_CHAVE = 'COLE-AQUI-A-CHAVE';
+/* ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ */
+const FIXA=/^https:\/\/script\.google\.com\/.+\/exec/.test(API_URL)&&!/COLE-AQUI/.test(API_CHAVE);
 const STORE='mp-dash-emissoes-v1';
 const $=s=>document.querySelector(s);
 const brl=v=>(v<0?'-':'')+'R$ '+Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -376,6 +385,7 @@ function load(){try{const j=JSON.parse(localStorage.getItem(STORE)||'null');if(j
 const CONN_KEY=STORE+'-conn';
 let CONN=null, autoTimer=null, loading=false, lastErr='';
 try{CONN=JSON.parse(localStorage.getItem(CONN_KEY)||'null')}catch(e){}
+if(FIXA)CONN={url:API_URL,token:API_CHAVE,auto:CONN?CONN.auto!==false:true}; // conexão embutida sempre vence
 function saveConn(){try{CONN?localStorage.setItem(CONN_KEY,JSON.stringify(CONN)):localStorage.removeItem(CONN_KEY)}catch(e){}}
 async function fetchOnline(silent){
   if(!CONN||!CONN.url||loading)return false;
@@ -426,7 +436,14 @@ function liveInfo(err){
   el.innerHTML=err?'<span class="live" style="background:var(--bad)"></span>sem conexão — tentando de novo':(CONN.auto?'<span class="live pulse"></span>ao vivo · ':'')+'verificado '+(s<5?'agora':'há '+(s<60?s+'s':Math.round(s/60)+' min'));
 }
 setInterval(()=>liveInfo(),5000);
-function syncConnUI(){$('#btnRefresh').classList.toggle('hidden',!CONN);$('#btnConn').textContent=CONN?'Conexão':'Planilha online'}
+function syncConnUI(){
+  $('#btnRefresh').classList.toggle('hidden',!CONN);$('#btnConn').textContent=CONN?'Conexão':'Planilha online';
+  $('#btnConn').classList.toggle('hidden',FIXA);                     // conexão embutida: nada para configurar
+  $('#btnConn2').classList.toggle('hidden',FIXA);
+  $('#emptyTitle').textContent=FIXA?'Carregando a planilha…':'Conecte a planilha';
+  $('#emptyMsg').innerHTML=FIXA?(lastErr?'<span class="neg">Não consegui carregar: '+esc(lastErr)+'</span><br><button class="btn primary" type="button" id="btnRetry" style="margin-top:10px">Tentar de novo</button>':'Buscando os dados de vendas. Isso leva alguns segundos.'):'Os dados vêm direto da planilha de vendas, via Apps Script, e se atualizam sozinhos.<br>Cartões, senhas de conta e CPFs não são enviados.';
+  const rt=$('#btnRetry');if(rt)rt.onclick=()=>{lastErr='';syncConnUI();fetchOnline(false).then(()=>syncConnUI())};
+}
 function openConn(){
   $('#cUrl').value=CONN?.url||'';$('#cTok').value=CONN?.token||'';$('#cAuto').checked=CONN?CONN.auto!==false:true;
   $('#cOff').classList.toggle('hidden',!CONN);$('#cMsg').textContent='';
@@ -759,7 +776,7 @@ let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>ROWS.le
 if(CONN&&load()){resetFilters(false)}
 boot();
 syncConnUI();setupAuto();
-if(CONN)fetchOnline(true);
+if(CONN)fetchOnline(true).then(()=>syncConnUI());
 })();
 </script>
 <script>
