@@ -73,7 +73,8 @@ header.top .sp{flex:1}
 .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:16px}
 .filters label{display:flex;flex-direction:column;font-size:11.5px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.03em;gap:4px}
 .filters select,.filters input{font:inherit;font-size:14px;text-transform:none;letter-spacing:0;font-weight:600;padding:7px 10px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--ink);min-width:150px;max-width:230px}
-.filters input{min-width:200px}
+.filters input{min-width:240px}
+td.hit{background:var(--accent-soft)!important;font-weight:800;border-radius:4px}
 .filters .reset{align-self:flex-end}
 @media (max-width:600px){.filters{display:grid;grid-template-columns:1fr 1fr}.filters select,.filters input{min-width:0;max-width:none;width:100%}.kpis{grid-template-columns:1fr}header.top h1{font-size:32px}}
 
@@ -186,7 +187,7 @@ dialog#dlgConn::backdrop{background:rgba(0,0,0,.45)}
       <label>Responsável<select id="fResp"></select></label>
       <label>Fornecedor<select id="fForn"></select></label>
       <label>Status<select id="fStatus"></select></label>
-      <label>Buscar<input id="fBusca" placeholder="Localizador ou cliente"></label>
+      <label>Buscar<input id="fBusca" placeholder="Localizador, cliente ou valor" title="Ex.: FDXBAK · João · 1.234,56 · 1234.56 · 562,26"></label>
       <button class="btn reset" id="btnReset">Limpar filtros</button>
     </div>
 
@@ -447,7 +448,7 @@ function toast(m){const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTim
 function uniq(k){const c={};ROWS.forEach(r=>c[r[k]]=(c[r[k]]||0)+1);return Object.keys(c).sort((a,b)=>c[b]-c[a])}
 function fillSelect(el,opts,all,val){el.innerHTML='<option value="">'+all+'</option>'+opts.map(o=>`<option value="${esc(o.v??o)}">${esc(o.t??o)}</option>`).join('');el.value=val||''}
 function buildFilters(){
-  const meses=[...new Set(ROWS.map(r=>r.mes))].sort().reverse();
+  const meses=[...new Set([...ROWS.map(r=>r.mes),mesAtual()])].sort().reverse(); // mês corrente sempre na lista
   const anos=[...new Set(meses.map(m=>m.slice(0,4)))];
   const per=[];
   anos.forEach(a=>per.push({v:'Y'+a,t:'Ano '+a}));
@@ -460,10 +461,10 @@ function buildFilters(){
   fillSelect($('#fStatus'),uniq('status'),'Todos',state.status);
   $('#fBusca').value=state.busca;
 }
+function mesAtual(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
 function resetFilters(render=true){
-  const meses=[...new Set(ROWS.map(r=>r.mes))].sort();
-  const lastY=meses.length?meses[meses.length-1].slice(0,4):'';
-  Object.assign(state,{periodo:lastY?'Y'+lastY:'',cia:'',resp:'',forn:'',status:'',busca:'',alert:'',limit:100});
+  // padrão ao abrir: mês corrente
+  Object.assign(state,{periodo:'M'+mesAtual(),cia:'',resp:'',forn:'',status:'',busca:'',alert:'',limit:100});
   if(render){buildFilters();render_()}
 }
 function inPeriod(r){
@@ -481,9 +482,33 @@ const ALERTS=[
   {k:'naopago',t:'Fornecedor externo não pago',c:'var(--s1)',f:r=>!r.pago&&r.custo>0&&!/Contas Nossa/.test(r.forn)&&!/^\(/.test(r.forn)&&!/cancel/i.test(r.status)},
   {k:'semcia',t:'Sem companhia',c:'var(--muted)',f:r=>r.cia==='(sem companhia)'}
 ];
+/* ---------- busca: texto (localizador/cliente) ou valor ---------- */
+const VAL_FIELDS=['venda','custo','lucro','taxas','milhas'];
+function parseBusca(){
+  const raw=String(state.busca||'').trim();
+  if(!raw)return null;
+  const clean=raw.replace(/R\$/i,'').replace(/\s/g,'');
+  if(/\d/.test(clean)&&/^-?[\d.,]+$/.test(clean)){
+    const v=num(clean);
+    // tem centavos? ("1.234,56", "1234.56", "562,2") → compara exato; senão compara só a parte inteira
+    const cents=/,\d{1,2}$/.test(clean)||(/\.\d{1,2}$/.test(clean)&&!clean.includes(','));
+    if(v!=null)return {tipo:'valor',v:Math.abs(v),cents,raw};
+  }
+  return {tipo:'texto',q:norm(raw),raw};
+}
+function valHit(r,b,f){
+  const x=Math.abs(r[f]||0);if(!x&&b.v)return false;
+  return b.cents?Math.abs(x-b.v)<0.005:Math.trunc(x)===Math.trunc(b.v);
+}
+function matchBusca(r,b){
+  if(!b)return true;
+  if(b.tipo==='valor')return VAL_FIELDS.some(f=>valHit(r,b,f));
+  return norm(r.loc).includes(b.q)||norm(r.cliente).includes(b.q);
+}
 function baseFiltered(){
-  const q=norm(state.busca);
-  return ROWS.filter(r=>inPeriod(r)&&(!state.cia||r.cia===state.cia)&&(!state.resp||r.resp===state.resp)&&(!state.forn||r.forn===state.forn)&&(!state.status||r.status===state.status)&&(!q||norm(r.loc).includes(q)||norm(r.cliente).includes(q)));
+  const b=parseBusca();
+  // com busca, procura em TODOS os períodos (achar um localizador antigo)
+  return ROWS.filter(r=>(b||inPeriod(r))&&(!state.cia||r.cia===state.cia)&&(!state.resp||r.resp===state.resp)&&(!state.forn||r.forn===state.forn)&&(!state.status||r.status===state.status)&&matchBusca(r,b));
 }
 
 /* ---------- agregações ---------- */
@@ -611,10 +636,10 @@ function render_(){
   $('#alerts').querySelectorAll('.alert').forEach(el=>el.onclick=()=>{state.alert=state.alert===el.dataset.k?'':el.dataset.k;state.limit=100;render_();if(state.alert)$('#tbl').scrollIntoView({behavior:'smooth',block:'start'})});
 
   // evolução mensal — ignora filtro de período para dar contexto, mas respeita os demais
-  const q=norm(state.busca);
-  const evoRows=ROWS.filter(r=>(!state.cia||r.cia===state.cia)&&(!state.resp||r.resp===state.resp)&&(!state.forn||r.forn===state.forn)&&(!state.status||r.status===state.status)&&(!q||norm(r.loc).includes(q)||norm(r.cliente).includes(q)));
+  const bq=parseBusca();
+  const evoRows=ROWS.filter(r=>(!state.cia||r.cia===state.cia)&&(!state.resp||r.resp===state.resp)&&(!state.forn||r.forn===state.forn)&&(!state.status||r.status===state.status)&&matchBusca(r,bq));
   let meses=agg(evoRows,'mes').sort((a,b)=>a.k<b.k?-1:1);
-  if(state.periodo&&state.periodo[0]==='Y')meses=meses.filter(m=>m.k.startsWith(state.periodo.slice(1)));
+  if(state.periodo&&(state.periodo[0]==='Y'||state.periodo[0]==='M'))meses=meses.filter(m=>m.k.startsWith(state.periodo.slice(1,5)));
   const M=state.metric;
   const MT={lucro:['Lucro por mês','Soma da coluna LUCRO',brlK,brl],venda:['Faturamento por mês','Total com taxas recebido',brlK,brl],milhas:['Milhas emitidas por mês','Soma da coluna MILHAS',intK,int],qtd:['Emissões por mês','Quantidade de localizadores',intK,int]}[M];
   $('#evoTitle').textContent=MT[0];$('#evoHint').textContent=MT[1]+(state.periodo[0]==='M'?' · clique numa barra para filtrar o mês':' · clique numa barra para filtrar o mês');
@@ -676,6 +701,7 @@ const TCOLS=[
   {k:'loc',t:'Localizador',f:r=>`<b>${esc(r.loc)}</b>`},
   {k:'cia',t:'Companhia',f:r=>esc(r.cia)},
   {k:'milhas',t:'Milhas',n:1,f:r=>int(r.milhas)},
+  {k:'taxas',t:'Taxas',n:1,f:r=>brl(r.taxas)},
   {k:'venda',t:'Faturamento',n:1,f:r=>brl(r.venda)},
   {k:'custo',t:'Custo c/ taxas',n:1,f:r=>brl(r.custo)},
   {k:'lucro',t:'Lucro',n:1,f:r=>`<span class="${r.lucro<0?'neg':''}">${brl(r.lucro)}</span>`},
@@ -690,11 +716,12 @@ function table(rows,al){
   const {k,d}=state.sort;
   rows=[...rows].sort((a,b)=>{const x=a[k],y=b[k];return (typeof x==='number'?x-y:String(x).localeCompare(String(y),'pt-BR'))*d});
   lastRows=rows;
+  const bb=parseBusca(), bv=bb&&bb.tipo==='valor'?bb:null;
   const vis=rows.slice(0,state.limit);
   $('#tbl').innerHTML='<thead><tr>'+TCOLS.map(c=>`<th class="${c.n?'num':''}" data-k="${c.k}">${c.t}${k===c.k?(d>0?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>'+
-    vis.map(r=>'<tr>'+TCOLS.map(c=>`<td class="${c.n?'num':''} ${c.cl?'cl':''}" ${c.cl?`title="${esc(r[c.k])}"`:''}>${c.f(r)}</td>`).join('')+'</tr>').join('')+'</tbody>';
-  $('#tbl').querySelectorAll('th').forEach(th=>th.onclick=()=>{const kk=th.dataset.k;state.sort={k:kk,d:state.sort.k===kk?-state.sort.d:(['data','milhas','venda','custo','lucro'].includes(kk)?-1:1)};render_()});
-  $('#tblHint').textContent=al?'Filtrando pelo alerta: '+al.t+' (clique no alerta de novo para limpar)':'Clique no cabeçalho para ordenar';
+    vis.map(r=>'<tr>'+TCOLS.map(c=>`<td class="${c.n?'num':''} ${c.cl?'cl':''} ${bv&&VAL_FIELDS.includes(c.k)&&valHit(r,bv,c.k)?'hit':''}" ${c.cl?`title="${esc(r[c.k])}"`:''}>${c.f(r)}</td>`).join('')+'</tr>').join('')+'</tbody>';
+  $('#tbl').querySelectorAll('th').forEach(th=>th.onclick=()=>{const kk=th.dataset.k;state.sort={k:kk,d:state.sort.k===kk?-state.sort.d:(['data','milhas','taxas','venda','custo','lucro'].includes(kk)?-1:1)};render_()});
+  $('#tblHint').textContent=bb?(bv?`Buscando o valor ${bv.cents?brl(bv.v):int(bv.v)+(bv.v<1000?'':'')} em faturamento, custo, lucro, taxas e milhas — em todos os períodos${bv.cents?'':' (sem centavos: qualquer centavo)'}`:`Buscando "${bb.raw}" em localizador e cliente — em todos os períodos`)+(al?' · alerta: '+al.t:''):al?'Filtrando pelo alerta: '+al.t+' (clique no alerta de novo para limpar)':'Clique no cabeçalho para ordenar';
   $('#tblCount').textContent=`Mostrando ${int(vis.length)} de ${int(rows.length)} · lucro ${brl(sum(rows,'lucro'))}`;
   $('#btnMore').classList.toggle('hidden',vis.length>=rows.length);
 }
