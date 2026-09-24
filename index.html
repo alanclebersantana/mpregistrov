@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MP Emissões">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
   color-scheme:light;
@@ -57,7 +57,19 @@ body{
 }
 .wrap{max-width:1280px;margin:0 auto;padding:20px 16px 60px}
 header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-header.top h1{font-family:Caveat,cursive;font-size:38px;line-height:1;margin:0;font-weight:700}
+header.top h1{font-family:Inter,system-ui,sans-serif;font-size:24px;line-height:1.1;margin:0;font-weight:800;letter-spacing:-.02em}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .logo{width:40px;height:40px;border-radius:10px;background:var(--accent);display:grid;place-items:center;flex:none}
+.brand .eyebrow{font-family:Inter,system-ui,sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.btn.icon svg{display:block}
+.banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-weight:600}
+.banner.err{border-color:var(--bad)}
+/* carregando: esqueleto no lugar dos números */
+#dash.loading .kpi .v,#dash.loading .kpi .s{color:transparent!important;border-radius:8px;background:linear-gradient(90deg,var(--surface-2) 25%,var(--grid) 50%,var(--surface-2) 75%);background-size:200% 100%;animation:sk 1.2s linear infinite}
+#dash.loading .kpi.hero .v,#dash.loading .kpi.hero .s{background:linear-gradient(90deg,rgba(255,255,255,.15) 25%,rgba(255,255,255,.3) 50%,rgba(255,255,255,.15) 75%);background-size:200% 100%}
+#dash.loading .kpi .v{width:70%} #dash.loading .kpi .s{width:50%}
+#dash.loading .chart,#dash.loading .rank,#dash.loading .tbl-wrap,#dash.loading #alerts{opacity:.25}
+@keyframes sk{to{background-position:-200% 0}}
 header.top .sub{color:var(--ink-2);font-size:13px}
 header.top .sp{flex:1}
 .btn{font:inherit;font-weight:700;font-size:14px;border:1px solid var(--border);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:10px;cursor:pointer}
@@ -141,7 +153,6 @@ table.data tr:hover td{background:var(--surface-2)}
 /* vazio */
 .empty{max-width:560px;margin:60px auto;text-align:center}
 .drop{border:1px solid var(--border);border-radius:16px;padding:40px 20px;background:var(--surface);transition:.15s}
-.drop h2{font-family:Caveat,cursive;font-size:34px;margin:0 0 6px}
 .drop p{color:var(--ink-2);margin:6px 0}
 .hidden{display:none!important}
 dialog#dlgConn{border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--ink);padding:0;width:min(520px,calc(100vw - 32px))}
@@ -162,25 +173,20 @@ dialog#dlgConn::backdrop{background:rgba(0,0,0,.45)}
 <body>
 <div class="wrap">
   <header class="top">
-    <h1>Dashboard de Emissões</h1>
-    <div class="sub" id="srcInfo">Milhas Plus</div>
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><rect x="3" y="12" width="4" height="9" rx="1.2"/><rect x="10" y="7" width="4" height="14" rx="1.2"/><rect x="17" y="3" width="4" height="18" rx="1.2"/></svg></div>
+      <div><div class="eyebrow">Milhas Plus</div><h1>Dashboard de Emissões</h1></div>
+    </div>
+    <div class="sub" id="srcInfo"></div>
     <div class="sp"></div>
     <button class="btn primary hidden" id="btnRefresh" title="Buscar dados atualizados da planilha">↻ Atualizar</button>
-    <button class="btn" id="btnConn">Planilha online</button>
+    <button class="btn icon" id="btnConn" title="Configurações da conexão" aria-label="Configurações"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     <button class="btn icon" id="btnTheme" title="Alternar tema">◐</button>
   </header>
 
-  <!-- estado vazio -->
-  <section id="emptyView" class="empty">
-    <div class="drop" id="drop">
-      <h2 id="emptyTitle">Conecte a planilha</h2>
-      <p><button class="btn primary" id="btnConn2" type="button">Conectar à planilha online</button></p>
-      <p style="font-size:13px" id="emptyMsg">Os dados vêm direto da planilha de vendas, via Apps Script, e se atualizam sozinhos.<br>Cartões, senhas de conta e CPFs não são enviados.</p>
-    </div>
-  </section>
-
   <!-- dashboard -->
-  <main id="dash" class="hidden">
+  <main id="dash">
+    <div class="banner hidden" id="banner"></div>
     <div class="filters">
       <label>Período<select id="fPeriodo"></select></label>
       <label>Companhia<select id="fCia"></select></label>
@@ -193,6 +199,14 @@ dialog#dlgConn::backdrop{background:rgba(0,0,0,.45)}
 
     <div class="kpis" id="kpis"></div>
 
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head">
+        <div><h2>Emissões</h2><p class="hint" id="tblHint"></p></div>
+        <button class="btn" id="btnCsv">Exportar CSV</button>
+      </div>
+      <div class="tbl-wrap"><table class="data" id="tbl"></table></div>
+      <div class="tbl-foot"><span id="tblCount"></span><button class="btn" id="btnMore">Mostrar mais</button></div>
+    </div>
     <div class="card" style="margin-bottom:16px">
       <div class="card-head">
         <div><h2>Alertas</h2><p class="hint" style="margin:0">Clique para ver as emissões na tabela</p></div>
@@ -236,14 +250,6 @@ dialog#dlgConn::backdrop{background:rgba(0,0,0,.45)}
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-head">
-        <div><h2>Emissões</h2><p class="hint" id="tblHint"></p></div>
-        <button class="btn" id="btnCsv">Exportar CSV</button>
-      </div>
-      <div class="tbl-wrap"><table class="data" id="tbl"></table></div>
-      <div class="tbl-foot"><span id="tblCount"></span><button class="btn" id="btnMore">Mostrar mais</button></div>
-    </div>
   </main>
 </div>
 <dialog id="dlgConn">
@@ -401,6 +407,7 @@ async function fetchOnline(silent){
     const {rows,abas,bad}=parseSheets(list);
     const first=!ROWS.length||!META.online;
     const changed=META.online&&META.versao!==j.versao;
+    lastErr='';
     ROWS=rows; META={arquivo:j.planilha,online:true,importado:Date.now(),verificado:Date.now(),versao:j.versao??null,abas,bad};
     if(changed&&silent){flashNext=true;toast('Planilha atualizada')}
     save();
@@ -412,7 +419,7 @@ async function fetchOnline(silent){
     console.error(err);lastErr=err.message;
     toast('Falha ao buscar a planilha: '+err.message);
     return false;
-  }finally{loading=false;setRefreshing(false)}
+  }finally{loading=false;setRefreshing(false);syncConnUI()}
 }
 function setRefreshing(on){const b=$('#btnRefresh');b.innerHTML=on?'<span class="spin">↻</span> Atualizando…':'↻ Atualizar';b.disabled=on}
 const POLL_MS=15000, FULL_MS=120000;
@@ -437,12 +444,16 @@ function liveInfo(err){
 }
 setInterval(()=>liveInfo(),5000);
 function syncConnUI(){
-  $('#btnRefresh').classList.toggle('hidden',!CONN);$('#btnConn').textContent=CONN?'Conexão':'Planilha online';
-  $('#btnConn').classList.toggle('hidden',FIXA);                     // conexão embutida: nada para configurar
-  $('#btnConn2').classList.toggle('hidden',FIXA);
-  $('#emptyTitle').textContent=FIXA?'Carregando a planilha…':'Conecte a planilha';
-  $('#emptyMsg').innerHTML=FIXA?(lastErr?'<span class="neg">Não consegui carregar: '+esc(lastErr)+'</span><br><button class="btn primary" type="button" id="btnRetry" style="margin-top:10px">Tentar de novo</button>':'Buscando os dados de vendas. Isso leva alguns segundos.'):'Os dados vêm direto da planilha de vendas, via Apps Script, e se atualizam sozinhos.<br>Cartões, senhas de conta e CPFs não são enviados.';
-  const rt=$('#btnRetry');if(rt)rt.onclick=()=>{lastErr='';syncConnUI();fetchOnline(false).then(()=>syncConnUI())};
+  $('#btnRefresh').classList.toggle('hidden',!CONN);
+  const bn=$('#banner');
+  if(!CONN){
+    bn.className='banner';bn.innerHTML='Nenhuma planilha conectada. <button class="btn primary" type="button" id="bnCfg">Configurar conexão</button>';
+    $('#bnCfg').onclick=openConn;
+  }else if(lastErr&&!ROWS.length){
+    bn.className='banner err';bn.innerHTML='<span class="neg">Não consegui carregar a planilha: '+esc(lastErr)+'</span><button class="btn primary" type="button" id="bnRetry">Tentar de novo</button><button class="btn" type="button" id="bnCfg">Configurações</button>';
+    $('#bnRetry').onclick=()=>{lastErr='';syncConnUI();fetchOnline(false)};$('#bnCfg').onclick=openConn;
+  }else bn.className='banner hidden';
+  $('#dash').classList.toggle('loading',!!CONN&&!ROWS.length&&!lastErr);
 }
 function openConn(){
   $('#cUrl').value=CONN?.url||'';$('#cTok').value=CONN?.token||'';$('#cAuto').checked=CONN?CONN.auto!==false:true;
@@ -691,7 +702,7 @@ function render_(){
   table(rows,al);
   // info
   const quando=META.importado?new Date(META.importado).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'';
-  $('#srcInfo').innerHTML=META.online?`${esc(META.arquivo)} · ${int(ROWS.length)} emissões · dados de ${quando} · <span id="liveInfo"></span>`:'Milhas Plus';
+  $('#srcInfo').innerHTML=META.online?`${esc(META.arquivo)} · ${int(ROWS.length)} emissões · dados de ${quando} · <span id="liveInfo"></span>`:'';
   liveInfo();
   $('#srcInfo').title=META.abas?'Abas lidas: '+META.abas.join(', '):'';
 }
@@ -752,12 +763,10 @@ function exportCsv(){
 
 /* ---------- eventos ---------- */
 function boot(){
-  const has=ROWS.length>0;
-  $('#emptyView').classList.toggle('hidden',has);$('#dash').classList.toggle('hidden',!has);
-  if(has){buildFilters();render_()}
+  if(!state.periodo)resetFilters(false);
+  buildFilters();render_();syncConnUI();
 }
 $('#btnConn').onclick=openConn;
-$('#btnConn2').onclick=e=>{e.stopPropagation();openConn()};
 $('#btnRefresh').onclick=()=>fetchOnline(false);
 $('#cSave').onclick=saveConnFromDialog;
 $('#cOff').onclick=()=>{CONN=null;saveConn();ROWS=[];META={};try{localStorage.removeItem(STORE)}catch(e){}boot();syncConnUI();setupAuto();$('#dlgConn').close();toast('Planilha online desconectada')};
@@ -776,7 +785,7 @@ let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>ROWS.le
 if(CONN&&load()){resetFilters(false)}
 boot();
 syncConnUI();setupAuto();
-if(CONN)fetchOnline(true).then(()=>syncConnUI());
+if(CONN)fetchOnline(!ROWS.length?false:true);
 })();
 </script>
 <script>
