@@ -1,5 +1,5 @@
 // Service worker: guarda só os arquivos do app. Os dados (Apps Script) sempre vão pela rede.
-const CACHE = 'mp-emissoes-v2';
+const CACHE = 'mp-emissoes-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/favicon-32.png'];
 
