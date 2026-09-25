@@ -393,34 +393,65 @@ let CONN=null, autoTimer=null, loading=false, lastErr='';
 try{CONN=JSON.parse(localStorage.getItem(CONN_KEY)||'null')}catch(e){}
 if(FIXA)CONN={url:API_URL,token:API_CHAVE,auto:CONN?CONN.auto!==false:true}; // conexão embutida sempre vence
 function saveConn(){try{CONN?localStorage.setItem(CONN_KEY,JSON.stringify(CONN)):localStorage.removeItem(CONN_KEY)}catch(e){}}
+let histLoading=false, LIVE={mes:null,rows:null};
+async function apiGet(extra){
+  const u=CONN.url+(CONN.url.includes('?')?'&':'?')+'token='+encodeURIComponent(CONN.token||'')+(extra||'')+'&_='+Date.now();
+  const res=await fetch(u,{redirect:'follow'});
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  const txt=await res.text();
+  let j; try{j=JSON.parse(txt)}catch(e){throw new Error('A URL não devolveu JSON — confira se a implantação está como "Qualquer pessoa"')}
+  if(!j.ok)throw new Error(j.erro||'Erro no script');
+  return j;
+}
+const toRows=j=>parseSheets(j.abas.map(a=>({name:a.nome,aoa:[j.cabecalho,...a.linhas]})));
+
+/* 1º plano: só o mês corrente (lido direto da planilha, pequeno e rápido)
+   2º plano: histórico completo (cache do servidor)                        */
 async function fetchOnline(silent){
   if(!CONN||!CONN.url||loading)return false;
   loading=true; setRefreshing(true);
-  const t0=performance.now();
+  const t0=performance.now(), mes=mesAtual(), first=!ROWS.length||!META.online;
+  let ok=false, completo=false;
   try{
-    const u=CONN.url+(CONN.url.includes('?')?'&':'?')+'token='+encodeURIComponent(CONN.token||'')+'&_='+Date.now();
-    const res=await fetch(u,{redirect:'follow'});
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    const txt=await res.text();
-    let j; try{j=JSON.parse(txt)}catch(e){throw new Error('A URL não devolveu JSON — confira se a implantação está como "Qualquer pessoa"')}
-    if(!j.ok)throw new Error(j.erro||'Erro no script');
-    const list=j.abas.map(a=>({name:a.nome,aoa:[j.cabecalho,...a.linhas]}));
-    const {rows,abas,bad}=parseSheets(list);
-    const first=!ROWS.length||!META.online;
-    const changed=META.online&&META.versao!==j.versao;
-    lastErr='';
-    ROWS=rows; META={ms:Math.round(performance.now()-t0),arquivo:j.planilha,online:true,importado:Date.now(),verificado:Date.now(),versao:j.versao??null,abas,bad};
-    if(changed&&silent){flashNext=true;toast('Planilha atualizada')}
-    save();
+    const j=await apiGet('&modo=mes&mes='+mes);
+    const {rows,abas,bad}=toRows(j);
+    lastErr=''; ok=true;
+    if(j.modo==='mes'){
+      const cur=rows.filter(r=>r.mes===mes);
+      LIVE={mes,rows:cur};
+      ROWS=ROWS.filter(r=>r.mes!==mes).concat(cur);
+      META=Object.assign({},META,{msMes:Math.round(performance.now()-t0),arquivo:j.planilha,online:true,importado:Date.now(),verificado:Date.now()});
+    }else{ // script antigo, sem modo rápido: já veio tudo
+      ROWS=rows; completo=true;
+      META={ms:Math.round(performance.now()-t0),arquivo:j.planilha,online:true,importado:Date.now(),verificado:Date.now(),versao:j.versao??null,abas,bad};
+    }
+    flashNext=silent&&!first;
     if(first)resetFilters(false);
-    boot();
-    if(!silent)toast(int(rows.length)+' emissões carregadas de '+abas.length+' abas'+(bad?' · '+bad+' com data inválida ignorada(s)':''));
-    return true;
+    save(); boot();
   }catch(err){
     console.error(err);lastErr=err.message;
     toast('Falha ao buscar a planilha: '+err.message);
-    return false;
   }finally{loading=false;setRefreshing(false);syncConnUI()}
+  if(ok&&!completo)carregarHistorico(silent,t0);
+  return ok;
+}
+async function carregarHistorico(silent,t0){
+  if(histLoading)return;
+  histLoading=true; liveInfo();
+  const prevVer=META.versao;
+  try{
+    const j=await apiGet('');
+    const {rows,abas,bad}=toRows(j);
+    const mes=mesAtual();
+    // mês corrente: fica o que veio ao vivo (mais novo que o cache); resto vem do histórico
+    const cur=LIVE.mes===mes&&LIVE.rows?LIVE.rows:rows.filter(r=>r.mes===mes);
+    ROWS=rows.filter(r=>r.mes!==mes).concat(cur);
+    META=Object.assign({},META,{ms:Math.round(performance.now()-t0),versao:j.versao??null,abas,bad,completo:Date.now()});
+    if(silent&&prevVer!=null&&prevVer!==j.versao)toast('Planilha atualizada');
+    flashNext=!!silent;
+    save(); boot();
+  }catch(e){console.warn('histórico',e)}
+  finally{histLoading=false;liveInfo()}
 }
 function setRefreshing(on){const b=$('#btnRefresh');b.innerHTML=on?'<span class="spin">↻</span> Atualizando…':'↻ Atualizar';b.disabled=on}
 const POLL_MS=15000, FULL_MS=120000;
@@ -442,6 +473,7 @@ function liveInfo(err){
   if(!META.online||!CONN){el.textContent='';return}
   const s=Math.round((Date.now()-(META.verificado||META.importado))/1000);
   el.innerHTML=err?'<span class="live" style="background:var(--bad)"></span>sem conexão — tentando de novo':(CONN.auto?'<span class="live pulse"></span>ao vivo · ':'')+'verificado '+(s<5?'agora':'há '+(s<60?s+'s':Math.round(s/60)+' min'));
+  if(histLoading)el.innerHTML+=' · <span class="spin" style="font-size:11px">↻</span> carregando meses anteriores…';
 }
 setInterval(()=>liveInfo(),5000);
 function syncConnUI(){
@@ -705,7 +737,8 @@ function render_(){
   const quando=META.importado?new Date(META.importado).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'';
   $('#srcInfo').innerHTML=META.online?`${esc(META.arquivo)} · ${int(ROWS.length)} emissões · dados de ${quando} · <span id="liveInfo"></span>`:'';
   liveInfo();
-  $('#srcInfo').title=(META.ms?'Carregado em '+(META.ms/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+' s · ':'')+(META.abas?'Abas lidas: '+META.abas.join(', '):'');
+  const fmtS=ms=>(ms/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+' s';
+  $('#srcInfo').title=(META.msMes?'Mês corrente em '+fmtS(META.msMes)+' · ':'')+(META.ms?'Tudo em '+fmtS(META.ms)+' · ':'')+(META.abas?'Abas lidas: '+META.abas.join(', '):'');
   if(META.ms)console.info('[MP] dados carregados em',META.ms,'ms');
 }
 let prevKpi=null, flashNext=false;
