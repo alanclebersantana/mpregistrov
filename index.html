@@ -396,6 +396,7 @@ function saveConn(){try{CONN?localStorage.setItem(CONN_KEY,JSON.stringify(CONN))
 async function fetchOnline(silent){
   if(!CONN||!CONN.url||loading)return false;
   loading=true; setRefreshing(true);
+  const t0=performance.now();
   try{
     const u=CONN.url+(CONN.url.includes('?')?'&':'?')+'token='+encodeURIComponent(CONN.token||'')+'&_='+Date.now();
     const res=await fetch(u,{redirect:'follow'});
@@ -408,7 +409,7 @@ async function fetchOnline(silent){
     const first=!ROWS.length||!META.online;
     const changed=META.online&&META.versao!==j.versao;
     lastErr='';
-    ROWS=rows; META={arquivo:j.planilha,online:true,importado:Date.now(),verificado:Date.now(),versao:j.versao??null,abas,bad};
+    ROWS=rows; META={ms:Math.round(performance.now()-t0),arquivo:j.planilha,online:true,importado:Date.now(),verificado:Date.now(),versao:j.versao??null,abas,bad};
     if(changed&&silent){flashNext=true;toast('Planilha atualizada')}
     save();
     if(first)resetFilters(false);
@@ -704,7 +705,8 @@ function render_(){
   const quando=META.importado?new Date(META.importado).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'';
   $('#srcInfo').innerHTML=META.online?`${esc(META.arquivo)} · ${int(ROWS.length)} emissões · dados de ${quando} · <span id="liveInfo"></span>`:'';
   liveInfo();
-  $('#srcInfo').title=META.abas?'Abas lidas: '+META.abas.join(', '):'';
+  $('#srcInfo').title=(META.ms?'Carregado em '+(META.ms/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+' s · ':'')+(META.abas?'Abas lidas: '+META.abas.join(', '):'');
+  if(META.ms)console.info('[MP] dados carregados em',META.ms,'ms');
 }
 let prevKpi=null, flashNext=false;
 function fitKpis(){ // diminui a fonte até o número caber inteiro no card
